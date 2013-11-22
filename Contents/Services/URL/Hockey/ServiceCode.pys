@@ -9,7 +9,7 @@ QUALITY_MARKER = "{q}"
 def MetadataObjectForURL(url):
 		
 	Log.Info("Generate Hockey metadata for " + url)
-	
+		
 	# parse the query string into a dictionary.
 	# don't use the urlparse library, it breaks some deployments
 	# https://raw.github.com/pudds/JsonData/master/h/g/2013020037.json?type=replayFullHome&name=mapleleafs
@@ -17,7 +17,10 @@ def MetadataObjectForURL(url):
 	#Log.Debug("data: " + str(data))
 	title = ""
 	
-	game = GetGameJson(url)
+	if "meta" in data:
+		game = GetGameJson(data["meta"])
+	else:
+		game = GetGameJson(url)
 	
 	desc = game["summary"]
 	logo = R(data["logo"])
@@ -44,8 +47,11 @@ def MetadataObjectForURL(url):
 @deferred # tells plex not to call this until the link is clicked
 def MediaObjectsForURL(url):
 
-	game = GetGameJson(url)
 	data = ParseQueryString(url)
+	if "meta" in data:
+		game = GetGameJson(data["meta"])
+	else:
+		game = GetGameJson(url)
 	
 	type = data["type"]
 	
@@ -55,7 +61,7 @@ def MediaObjectsForURL(url):
 		return BuildReplayObject(game, data)
 	
 	if type == "liveHome" or type == "liveAway":
-		return BuildLiveStream(game, data)
+		return BuildLiveStream(url)
 		
 	if type == "highlight":
 		return BuildHighlightObject(game, data)
@@ -66,24 +72,14 @@ def MediaObjectsForURL(url):
 
 
 ####################################################################################################
-def BuildLiveStream(game, data):
+def BuildLiveStream(url):
 	
-	type = data["type"]
-	name = data["name"]
-	quality = data["q"]
-	
-	if type == "liveHome":
-		server = game["h"]["live"]
-	else:
-		server = game["a"]["live"]
-	
-	videoUrl = LIVE_STREAM_FORMAT.replace("{server}", server).replace("{streamName}", name).replace("{q}", quality)
-	Log.Debug("Live URL: " + videoUrl)
+	Log.Debug("Live URL: " + url)
 	
 	return [
 		 MediaObject(
 			optimized_for_streaming=True,
-			parts = [PartObject(key=HTTPLiveStreamURL(Callback(PlayHLS2, url=videoUrl)))],
+			parts = [PartObject(key=HTTPLiveStreamURL(Callback(PlayHLS2, url=url)))],
 		)
 	]
 	

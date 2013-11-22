@@ -15,7 +15,6 @@
 				<key>URLPatterns</key>
 				<array>
 					<string>^http://nlds.+.cdnak.neulion.com/nlds/nhl/.+</string>
-					<string>^http://boulder.zxq.net.+</string>
 					<string>^https://raw.github.com/pudds/JsonData/master/h/g/.+.json</string>
 				</array>
 			</dict>

@@ -13,6 +13,7 @@ DEFAULT_TEAM_ICON = "Team_DEFAULT.jpg"
 TODAY_URL = "https://raw.github.com/pudds/JsonData/master/h/today.txt"
 SCHEDULE_URL = "https://raw.github.com/pudds/JsonData/master/h/{year}-{month}-{day}.json"
 GAME_URL = "https://raw.github.com/pudds/JsonData/master/h/g/{gameid}.json"
+STREAMS_URL = "http://smb.cdnak.neulion.com/fs/nhl/mobile/feed_new/data/streams/{sid}/ipad/{t}_{gn}.json"
 
 STREAM_AVAILABLE_MINUTES_BEFORE = 20
 STREAM_HIDDEN_AFTER = 360 # 6 hours oughta be plenty...
@@ -165,6 +166,9 @@ def BuildGameMenu(container, gameId, highlightsCallback, selectQualityCallback):
 	
 	game, url = GetGameAndUrl(gameId)
 	
+	sourceUrl = STREAMS_URL.replace("{sid}", game["sid"]).replace("{t}", game["t"]).replace("{gn}", game["gn"])
+	streams = JSON.ObjectFromURL(sourceUrl)
+	
 	utcStart = parser.parse(game["utcStart"])
 	liveStreamsAvailable = GetMinutesToStart(utcStart) <= STREAM_AVAILABLE_MINUTES_BEFORE
 
@@ -177,13 +181,26 @@ def BuildGameMenu(container, gameId, highlightsCallback, selectQualityCallback):
 		liveStreamsAvailable = True
 		
 	Log.Debug("Live Streams Available? " + str(liveStreamsAvailable))
+	
+	for key in streams:
+		Log.Debug("key: " + key)
 		
-	# if there is a live away stream, add that
-	if game["a"]["live"] != "":
-		container.add(GetStreamDirectory(selectQualityCallback, url, "liveAway", game["a"]["ab"], L("AwayStreamLabelFormat"), liveStreamsAvailable))
+		
+	# live streams hang around for a while after the game is over.  don't render them if it's over.
+	if streams["finish"] == "false":
+		if "live" in streams["gameStreams"]["ipad"]["away"]:
+			team = GetTeamConfig(game["a"]["ab"])
+			awayUrl = streams["gameStreams"]["ipad"]["away"]["live"]["bitrate0"] + "?meta=" + url + "&type=liveAway" + "&name=" + team["LiveName"] + "&logo=" + team["Logo"]
+			title = str(L("AwayStreamLabelFormat")).replace("{name}", team["Name"])
+			Log.Debug("awayUrl: " + awayUrl)
+			container.add(VideoClipObject(url = awayUrl, title = title, thumb = R(team["Logo"])))
 
-	if game["h"]["live"] != "":
-		container.add(GetStreamDirectory(selectQualityCallback, url, "liveHome", game["h"]["ab"], L("HomeStreamLabelFormat"), liveStreamsAvailable))
+		if "live" in streams["gameStreams"]["ipad"]["home"]:
+			team = GetTeamConfig(game["h"]["ab"])
+			homeUrl = streams["gameStreams"]["ipad"]["away"]["live"]["bitrate0"] + "?meta=" + url + "&type=liveHome" + "&name=" + team["LiveName"] + "&logo=" + team["Logo"]
+			title = str(L("AwayStreamLabelFormat")).replace("{name}", team["Name"])
+			Log.Debug("homeUrl: " + homeUrl)
+			container.add(VideoClipObject(url = homeUrl, title = title, thumb = R(team["Logo"])))
 		
 	# replays
 	if game["a"]["replayShort"] != "":
@@ -255,7 +272,7 @@ def GetStreamDirectory(selectQualityCallback, gameUrl, type, teamAb, titleFormat
 		title = title,
 		thumb = R(team["Logo"])
 	)
-	
+
 
 def GetGameAndUrl(gameId):
 	url = GAME_URL.replace("{gameid}", gameId)

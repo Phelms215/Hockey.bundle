@@ -266,7 +266,7 @@ def GetGameAndUrl(gameId):
 	
 def GetToday():
 	
-	todayString = str(HTTP.Request(TODAY_URL, follow_redirects=False, cacheTime=300).content).strip()
+	todayString = str(HTTP.Request(TODAY_URL, follow_redirects=False, cacheTime=0).content).strip()
 	Log.Debug("Today from file: " + todayString)
 	today = datetime.datetime.strptime(todayString, DATE_FORMAT)
 	today = today.replace(tzinfo = EASTERN)

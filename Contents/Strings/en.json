@@ -1,7 +1,8 @@
 {
 	"MainMenuTitle": "Hockey",
 	"ErrorNoGames": "No games could be found.",
-	"ErrorNoStreams": "No video could be found for this game.",
+	"ErrorNotStarted": "Live streams are not yet available",
+	"ErrorCompleteNoReplays": "Game is complete but replays not yet available.",
 	"ErrorStreamsNotReady": "Stream will be available 20 minutes before gametime.",
 	"HomeStreamLabelFormat": "Home Stream ({name})",
 	"AwayStreamLabelFormat": "Away Stream ({name})",

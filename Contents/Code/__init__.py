@@ -57,13 +57,7 @@ def ArchiveMenu(startDate):
 def GameMenu(gameId, title, home, away, summary):
 	dir = ObjectContainer(title2 = title, art=R(core.ART), view_group = "List")
 	
-	core.BuildGameMenu(dir, gameId, HighlightsMenu, SelectQualityMenu, home, away, summary) 
-	
-	if len(dir) == 0:		
-		dir.add(DirectoryObject(
-			key = Callback(GameMenu, gameId=gameId, title=title), # call back to itself makes it go nowhere - in some clients anyway.
-			title = L("ErrorNoStreams")
-		))
+	core.BuildGameMenu(dir, gameId, HighlightsMenu, home, away, summary, GameMenu) 	
 	
 	return dir
 	

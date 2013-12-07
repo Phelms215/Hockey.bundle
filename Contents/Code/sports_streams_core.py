@@ -187,37 +187,60 @@ def BuildScheduleMenu(container, date, gameCallback, mainMenuCallback):
 		))
 
 		
-def BuildGameMenu(container, gameId, highlightsCallback, selectQualityCallback, home, away, summary):
+def BuildGameMenu(container, gameId, highlightsCallback, home, away, summary, gameMenuCallback):
 	
 	game, gameUrl = GetGameAndUrl(gameId)
-			
+	
+	foundLive = False
+	foundReplay = False
 		
 	# live streams hang around for a while after the game is over.  don't render them if it's over.
 	if game["finish"] == "false":
 		if "live" in game["gameStreams"]["ipad"]["away"]:
 			vco = GetStreamObject(gameUrl, away, "liveAway", "AwayStreamLabelFormat", summary)
 			container.add(vco)
+			foundLive = True
 			
 		if "live" in game["gameStreams"]["ipad"]["home"]:
 			vco = GetStreamObject(gameUrl, home, "liveHome", "HomeStreamLabelFormat", summary)
 			container.add(vco)
+			foundLive = True
+		
+		if foundLive == False:
+			title = L("ErrorNotStarted")
+			container.add(DirectoryObject(
+				key = Callback(gameMenuCallback, gameId=gameId, title=title), # call back to itself makes it go nowhere - in some clients anyway.
+				title = title
+			))	
+			
 		
 	if game["finish"] == "true":
 		#replays away
 		if "vod-condensed" in game["gameStreams"]["ipad"]["away"]:
 			vco = GetStreamObject(gameUrl, away, "replayShortAway", "AwayReplayCondensedFormat", summary)
 			container.add(vco)			
+			foundReplay = True
 		if "vod-whole" in game["gameStreams"]["ipad"]["away"]:
 			vco = GetStreamObject(gameUrl, away, "replayFullAway", "AwayReplayFullFormat", summary)
 			container.add(vco)
+			foundReplay = True
 			
 		#replays home
 		if "vod-condensed" in game["gameStreams"]["ipad"]["home"]:
 			vco = GetStreamObject(gameUrl, home, "replayShortHome", "HomeReplayCondensedFormat", summary)
 			container.add(vco)			
+			foundReplay = True
 		if "vod-whole" in game["gameStreams"]["ipad"]["home"]:
 			vco = GetStreamObject(gameUrl, home, "replayFullHome", "HomeReplayFullFormat", summary)
 			container.add(vco)
+			foundReplay = True
+			
+		if foundReplay == False:
+			title = L("ErrorCompleteNoReplays")
+			container.add(DirectoryObject(
+				key = Callback(gameMenuCallback, gameId=gameId, title=title), # call back to itself makes it go nowhere - in some clients anyway.
+				title = title
+			))	
 			
 
 def GetStreamObject(gameUrl, teamAbbr, type, labelFormat, summary):

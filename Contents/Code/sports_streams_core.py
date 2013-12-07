@@ -197,8 +197,8 @@ def BuildGameMenu(container, gameId, highlightsCallback, selectQualityCallback):
 
 		if "live" in streams["gameStreams"]["ipad"]["home"]:
 			team = GetTeamConfig(game["h"]["ab"])
-			homeUrl = streams["gameStreams"]["ipad"]["away"]["live"]["bitrate0"] + "?meta=" + url + "&type=liveHome" + "&name=" + team["LiveName"] + "&logo=" + team["Logo"]
-			title = str(L("AwayStreamLabelFormat")).replace("{name}", team["Name"])
+			homeUrl = streams["gameStreams"]["ipad"]["home"]["live"]["bitrate0"] + "?meta=" + url + "&type=liveHome" + "&name=" + team["LiveName"] + "&logo=" + team["Logo"]
+			title = str(L("HomeStreamLabelFormat")).replace("{name}", team["Name"])
 			Log.Debug("homeUrl: " + homeUrl)
 			container.add(VideoClipObject(url = homeUrl, title = title, thumb = R(team["Logo"])))
 		

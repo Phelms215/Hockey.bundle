@@ -1,73 +1,229 @@
 import string
-#import urlparse
-#import teams
 
+LIVE_STREAM_FORMAT = "http://nlds{server}.cdnak.neulion.com/nlds/nhl/{streamName}/as/live/{streamName}_hd_{q}.m3u8"
+REPLAY_STREAM_FORMAT = "http://nlds{server}.cdnak.neulion.com/nlds_vod/nhl/vod/{year}/{month}/{day}/{gameNumber}/{type}_{gameNumber}_{away}_{home}_1314_{awayHome}_{fullShort}_{replayNumber}_{q}_ipad.mp4.m3u8"
+HIGHLIGHT_FORMAT = "http://nhl.cdnllnwnl.neulion.net/u/nhlmobile/vod/nhl/{year}/{month}/{day}/{gameNumber}/{type}_{gameNumber}_{away}_{home}_1314_{awayHome}_discrete_{key}_{highlightType}_{highlightNumber}_{q}.mp4"
+QUALITY_MARKER = "{q}" 
 
 ####################################################################################################
 def MetadataObjectForURL(url):
-	
-	#parts = urlparse.urlparse(url)	
-	#query = urlparse.parse_qs(parts.query)
-	
-	#title = query["t"][0]	
-	#logo = query["l"][0]
-	#desc = query["d"][0]
-	
+		
 	Log.Info("Generate Hockey metadata for " + url)
+		
+	# parse the query string into a dictionary.
+	# don't use the urlparse library, it breaks some deployments
+	# https://raw.github.com/pudds/JsonData/master/h/g/2013020037.json?type=replayFullHome&name=mapleleafs
+	data = ParseQueryString(url)
+	#Log.Debug("data: " + str(data))
+	title = ""
 	
-	title = "Game Stream"
-	desc = ""
-	logo = R("TEAM_Default.jpg")
+	if "meta" in data:
+		game = GetGameJson(data["meta"])
+	else:
+		game = GetGameJson(url)
+	
+	desc = game["summary"]
+	logo = R(data["logo"])
+	
+	if data["type"] == "liveAway" or data["type"] == "liveHome":
+		title = "Live"
+	elif data["type"] == "replayFullAway" or data["type"] == "replayFullHome":
+		title = "Full Replay"
+	elif data["type"] == "replayShortAway" or data["type"] == "replayShortHome":
+		title = "Condensed Replay"
+	elif data["type"] == "highlight":
+		title = "Highlight"
+		desc = data["summary"] # highlights pass summary on url
+	
 
     # Construct a metadata item
 	return VideoClipObject(
 		title = title,
-		thumb=R(logo),
+		thumb=logo,
 		summary = desc
 	)
 
 ####################################################################################################
+@deferred # tells plex not to call this until the link is clicked
 def MediaObjectsForURL(url):
 
-	return [
-		 MediaObject(
-			optimized_for_streaming=True,
-			parts = [PartObject(key=HTTPLiveStreamURL(Callback(PlayVideo, url=url)))],
-			audio_channels = 2,
-			container = Container.MP4
-		)
-	]
+	data = ParseQueryString(url)
+	if "meta" in data:
+		game = GetGameJson(data["meta"])
+	else:
+		game = GetGameJson(url)
+	
+	type = data["type"]
+	
+	Log.Debug("Media object type: " + type)
+	
+	if type == "replayFullHome" or type == "replayFullAway" or type == "replayShortHome" or type == "replayShortAway":
+		return BuildReplayObject(game, data)
+	
+	if type == "liveHome" or type == "liveAway":
+		return BuildLiveStream(url)
+		
+	if type == "highlight":
+		return BuildHighlightObject(game, data)
+		
+	#shouldn't be here
+	raise Exception("Could not build video objects (invalid type)")
+
 
 
 ####################################################################################################
-def PlayVideo(url):
+def BuildLiveStream(url):
 	
+	Log.Debug("Live URL: " + url)
+	
+	return [
+		 MediaObject(
+			optimized_for_streaming=True,
+			parts = [PartObject(key=HTTPLiveStreamURL(Callback(PlayHLS2, url=url)))],
+		)
+	]
+	
+def PlayHLS2(url):
+	# this seems to work on the iOS clients, and it's way easier...
+	# if only we could set the user-agent on the redirect to player.
+	return Redirect(url)
+	
+def PlayHLS(url):
 	Log.Debug("service PlayVideo: " + url)
 	
 	playlist = HTTP.Request(url, follow_redirects=False).content
-	
-	playlist_base = ""
-	
-	if string.find(url, "m3u8") > -1: # direct stream, needs base
-		index = string.rfind(url, "/")
-		playlist_base = url[0:index+1]
 
-	return GeneratePlaylist(playlist, playlist_base)
-	
-def GeneratePlaylist(playlist, playlist_base):	
-
+	index = string.rfind(url, "/")
+	playlist_base = url[0:index+1]
 	Log.Debug("base: " + playlist_base)
 
-	new_playlist = '#EXTM3U'
-	for line in playlist.splitlines()[1:-2]:
+	new_playlist = ""
+
+	
+	for line in playlist.splitlines():
 		if line.startswith('#'):
 			# take it as is
 			Log.Debug("line: " + line)
-			new_playlist = new_playlist + "\n" + line
+			new_playlist = new_playlist + line + "\n"
 		else:
 			line = playlist_base + line
 			Log.Debug("line: " + line)
-			new_playlist = new_playlist + "\n" + line			
+			new_playlist = new_playlist + line + "\n"
 
 	return new_playlist
 	
+def GetGameJson(url):	
+	return JSON.ObjectFromURL(url)
+	
+def ParseQueryString(url):	
+	queryStart = url.find("?") + 1
+	query = url[queryStart:len(url)]
+	Log.Debug("Query string: " + query)
+	parts = query.split("&")	
+	data = {}
+	
+	for part in parts:
+		kvp = part.split("=")
+		key = kvp[0]
+		value = kvp[1]
+		data[key] = value
+
+	return data
+	
+
+def BuildReplayObject(game, data):
+	year = game["easternStart"][0:4]
+	month = game["easternStart"][5:7]
+	day = game["easternStart"][8:10]
+	gameType = game["t"].lstrip("0") # not zero padded
+	gameNumber = game["gn"].lstrip("0") # not zero padded
+	quality = data["q"]
+	type = data["type"]
+	
+	if type == "replayFullHome":
+		awayHome = "h"
+		fullShort = "whole"
+		server = game["h"]["replayFull"]
+		replayNumber = game["h"]["replayFullNumber"]
+		
+	elif type == "replayFullAway":
+		awayHome = "a"
+		fullShort = "whole"
+		server = game["a"]["replayFull"]
+		replayNumber = game["a"]["replayFullNumber"]
+		
+	elif type == "replayShortHome":
+		awayHome = "h"
+		fullShort = "condensed"
+		server = game["h"]["replayShort"]
+		replayNumber = game["h"]["replayShortNumber"]
+		
+	elif type == "replayShortAway":
+		awayHome = "a"
+		fullShort = "condensed"
+		server = game["a"]["replayShort"]
+		replayNumber = game["a"]["replayShortNumber"]
+		
+	videoUrl = REPLAY_STREAM_FORMAT.replace("{year}", year).replace("{month}", month).replace("{day}", day)
+	videoUrl = videoUrl.replace("{type}", gameType).replace("{gameNumber}", gameNumber).replace("{away}", game["a"]["ab"]).replace("{home}", game["h"]["ab"])
+	videoUrl = videoUrl.replace("{awayHome}", awayHome).replace("{fullShort}", fullShort).replace("{q}", quality)
+	videoUrl = videoUrl.replace("{server}", server).replace("{replayNumber}", str(replayNumber))
+	
+	Log.Debug("Replay Url: " + videoUrl) 
+		
+	return [
+		 MediaObject(
+			parts = [PartObject(key = Callback(PlayHLS, url = videoUrl))]
+		)
+	] 
+
+	
+def BuildHighlightObject(game, data):
+	Log.Debug("Highlight")
+	
+	year = game["easternStart"][0:4]
+	month = game["easternStart"][5:7]
+	day = game["easternStart"][8:10]
+	gameType = game["t"].lstrip("0") # not zero padded
+	gameNumber = game["gn"].lstrip("0") # not zero padded
+	quality = data["q"]
+	type = data["type"]
+	key = data["key"]
+	
+	#find the highlight
+	for item in game["pbp"]:
+		if item["key"] == key:
+			pbp = item
+			break
+			
+	if pbp == None:
+		raise Exception("could not find pbp with key " + key)
+	
+	if data["home"] == "True":
+		highlightType = pbp["homeType"]
+		highlightNumber = pbp["homeNumber"]
+		awayHome = "h"
+	else:
+		highlightType = pbp["awayType"]
+		highlightNumber = pbp["awayNumber"]
+		awayHome = "a"
+		
+		
+	videoUrl = HIGHLIGHT_FORMAT.replace("{year}", year).replace("{month}", month).replace("{day}", day)
+	videoUrl = videoUrl.replace("{type}", gameType).replace("{gameNumber}", gameNumber).replace("{away}", game["a"]["ab"]).replace("{home}", game["h"]["ab"])
+	videoUrl = videoUrl.replace("{awayHome}", awayHome).replace("{q}", quality).replace("{key}", key)
+	videoUrl = videoUrl.replace("{highlightNumber}", str(highlightNumber)).replace("{highlightType}", highlightType)
+	
+	Log.Debug("Highlight Url: " + videoUrl) 
+		
+	return [
+		 MediaObject(
+			parts = [PartObject(key = Callback(PlayHighlight, url = videoUrl))]
+		)
+	] 
+
+	
+def PlayHighlight(url):
+	# this seems to work on the iOS clients, and it's way easier...
+	# if only we could set the user-agent on the redirect to player.
+	return Redirect(url)

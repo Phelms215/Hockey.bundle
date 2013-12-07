@@ -1,14 +1,23 @@
 {
 	"MainMenuTitle": "Hockey",
 	"ErrorNoGames": "No games could be found.",
-	"ErrorNoStreams": "No streams could be found for this game.",
-	"ErrorStreamsNotReady": "Stream available {minutes} minutes before game time.",
-	"HomeStreamLabelFormat": "Home Stream ({city})",
-	"AwayStreamLabelFormat": "Away Stream ({city})",
+	"ErrorNoStreams": "No video could be found for this game.",
+	"ErrorStreamsNotReady": "Stream will be available 20 minutes before gametime.",
+	"HomeStreamLabelFormat": "Home Stream ({name})",
+	"AwayStreamLabelFormat": "Away Stream ({name})",
 	"MatchupFormat": "{away} at {home} - {time}",
 	"MatchupFormatWindows": "{away} at {home}",
 	"MatchupFormatLinux": "{away} at {home}",
 	"MatchupFormatMacOSX": "{away} at {home}",
+	"MatchupFormatiOS": "{away} at {home}",
 	"SummaryFormat": "Game time: {time} - {summary}",
-	
+	"TodayLabel": "Today",
+	"TomorrowLabel": "Tomorrow",
+	"ArchiveLabel": "Archive",
+	"ScheduleDateFormat": "%b %d",
+	"HomeReplayCondensedFormat": "Condensed Replay ({name})",
+	"AwayReplayCondensedFormat": "Condensed Replay ({name})",
+	"HomeReplayFullFormat": "Full Replay ({name})",
+	"AwayReplayFullFormat": "Full Replay ({name})",
+	"HighlightsLabel": "Highlights"
 }

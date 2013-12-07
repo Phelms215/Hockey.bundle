@@ -16,6 +16,7 @@
 				<array>
 					<string>^http://nlds.+.cdnak.neulion.com/nlds/nhl/.+</string>
 					<string>^https://raw.github.com/pudds/JsonData/master/h/g/.+.json</string>
+					<string>^http://smb.cdnak.neulion.com/fs/nhl/mobile/feed_new/data/streams/.+/ipad/.+.json</string>
 				</array>
 			</dict>
 		</dict>

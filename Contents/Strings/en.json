@@ -10,7 +10,7 @@
 	"MatchupFormatLinux": "{away} at {home}",
 	"MatchupFormatMacOSX": "{away} at {home}",
 	"MatchupFormatiOS": "{away} at {home}",
-	"SummaryFormat": "Game time: {time} - {summary}",
+	"SummaryFormat": "Game time: {time}. {summary}",
 	"TodayLabel": "Today",
 	"TomorrowLabel": "Tomorrow",
 	"ArchiveLabel": "Archive",

@@ -10,10 +10,8 @@ ART = 'art-default.png'
 ICON = 'icon-default.png'
 DEFAULT_TEAM_ICON = "Team_DEFAULT.jpg"
 
-TODAY_URL = "https://raw.github.com/pudds/JsonData/master/h/today.txt"
-SCHEDULE_URL = "https://raw.github.com/pudds/JsonData/master/h/{year}-{month}-{day}.json"
-GAME_URL = "https://raw.github.com/pudds/JsonData/master/h/g/{gameid}.json"
-STREAMS_URL = "http://smb.cdnak.neulion.com/fs/nhl/mobile/feed_new/data/streams/{sid}/ipad/{t}_{gn}.json"
+SCHEDULE_URL = "http://smb.cdnak.neulion.com/fs1/nhl/league/schedule/{year}/{month}/{day}/iphone/schedule.json"
+GAME_URL = "http://smb.cdnak.neulion.com/fs/nhl/mobile/feed_new/data/streams/2013/ipad/{t}_{gn}.json"
 
 STREAM_AVAILABLE_MINUTES_BEFORE = 20
 STREAM_HIDDEN_AFTER = 360 # 6 hours oughta be plenty...
@@ -137,7 +135,34 @@ def BuildMainMenu(container, scheduleCallback, archiveCallback):
 		container.add(DirectoryObject(title = title, thumb = R(DEFAULT_TEAM_ICON), key = Callback(scheduleCallback, date = dateString, title = title)))
 		
 	#archive
-	container.add(DirectoryObject(title=L("ArchiveLabel"), key = Callback(archiveCallback)))
+	archiveStartDate = yesterdayDate + datetime.timedelta(days = -8) # the week prior to yesterday
+	archiveStartString = datetime.datetime.strftime(archiveStartDate, DATE_FORMAT)
+	container.add(DirectoryObject(title=L("ArchiveLabel"), thumb = R(DEFAULT_TEAM_ICON), key = Callback(archiveCallback, startDate = archiveStartString)))
+	
+def BuildArchiveMenu(container, startDate, scheduleCallBack, archiveCallBack, mainMenuCallBack):
+	 
+	firstDate = parser.parse(startDate)
+	dateFormat = str(L("ScheduleDateFormat")) # strftime can't take a localstring for some reason.	
+	
+	# earlier games
+	earlierDate = firstDate + datetime.timedelta(days = -7)
+	earlierDateString = datetime.datetime.strftime(earlierDate, DATE_FORMAT)
+	container.add(DirectoryObject(title=L("Earlier"), thumb = R(DEFAULT_TEAM_ICON), key = Callback(archiveCallBack, startDate = earlierDateString)))
+	
+	for x in range(1, 1 + 7):
+		date = firstDate + datetime.timedelta(days = x)
+		dateString = datetime.datetime.strftime(date, DATE_FORMAT)
+		title = datetime.datetime.strftime(date, dateFormat)
+		Log.Debug("Main menu date string: " + dateString)
+		container.add(DirectoryObject(title = title, thumb = R(DEFAULT_TEAM_ICON), key = Callback(scheduleCallBack, date = dateString, title = title)))
+			
+	# later games
+	laterDate = firstDate + datetime.timedelta(days = 7)
+	laterDateString = datetime.datetime.strftime(laterDate, DATE_FORMAT)
+	container.add(DirectoryObject(title=L("Later"), thumb = R(DEFAULT_TEAM_ICON), key = Callback(archiveCallBack, startDate = laterDateString)))
+	
+	#back to main menu
+	container.add(DirectoryObject(title=L("Menu Menu"), thumb = R(DEFAULT_TEAM_ICON), key = Callback(mainMenuCallBack)))
 	
 	
 def BuildScheduleMenu(container, date, gameCallback, mainMenuCallback):
@@ -155,72 +180,54 @@ def BuildScheduleMenu(container, date, gameCallback, mainMenuCallback):
 		title = GetStreamFormat(matchupFormat, game.Away, game.Home, game.UtcStart, game.Summary) 
 		summary = GetStreamFormat(summaryFormat, game.Away, game.Home, game.UtcStart, game.Summary)
 		container.add(DirectoryObject(
-			key = Callback(gameCallback, gameId = game.Id, title = title),
+			key = Callback(gameCallback, gameId = game.Id, title = title, home=game.Home, away=game.Away, summary=game.Summary),
 			title = title,
 			summary = summary,
 			thumb = R(DEFAULT_TEAM_ICON) 
 		))
 
 		
-def BuildGameMenu(container, gameId, highlightsCallback, selectQualityCallback):
+def BuildGameMenu(container, gameId, highlightsCallback, selectQualityCallback, home, away, summary):
 	
-	game, url = GetGameAndUrl(gameId)
-	
-	sourceUrl = STREAMS_URL.replace("{sid}", game["sid"]).replace("{t}", game["t"]).replace("{gn}", game["gn"])
-	streams = JSON.ObjectFromURL(sourceUrl)
-	
-	utcStart = parser.parse(game["utcStart"])
-	liveStreamsAvailable = GetMinutesToStart(utcStart) <= STREAM_AVAILABLE_MINUTES_BEFORE
-
-	#replays are always available (assuming the menu item appears), but for clarity, I'll use a variable here too
-	replaysAvailable = True
-	
-	hostname = str(socket.gethostname())
-	
-	if hostname in ["puddsPC", "Poseidon"]:
-		liveStreamsAvailable = True
-		
-	Log.Debug("Live Streams Available? " + str(liveStreamsAvailable))
-	
-	for key in streams:
-		Log.Debug("key: " + key)
-		
+	game, gameUrl = GetGameAndUrl(gameId)
+			
 		
 	# live streams hang around for a while after the game is over.  don't render them if it's over.
-	if streams["finish"] == "false":
-		if "live" in streams["gameStreams"]["ipad"]["away"]:
-			team = GetTeamConfig(game["a"]["ab"])
-			awayUrl = streams["gameStreams"]["ipad"]["away"]["live"]["bitrate0"] + "?meta=" + url + "&type=liveAway" + "&name=" + team["LiveName"] + "&logo=" + team["Logo"]
-			title = str(L("AwayStreamLabelFormat")).replace("{name}", team["Name"])
-			Log.Debug("awayUrl: " + awayUrl)
-			container.add(VideoClipObject(url = awayUrl, title = title, thumb = R(team["Logo"])))
+	if game["finish"] == "false":
+		if "live" in game["gameStreams"]["ipad"]["away"]:
+			vco = GetStreamObject(gameUrl, away, "liveAway", "AwayStreamLabelFormat", summary)
+			container.add(vco)
+			
+		if "live" in game["gameStreams"]["ipad"]["home"]:
+			vco = GetStreamObject(gameUrl, home, "liveHome", "HomeStreamLabelFormat", summary)
+			container.add(vco)
+		
+	if game["finish"] == "true":
+		#replays away
+		if "vod-condensed" in game["gameStreams"]["ipad"]["away"]:
+			vco = GetStreamObject(gameUrl, away, "replayShortAway", "AwayReplayCondensedFormat", summary)
+			container.add(vco)			
+		if "vod-whole" in game["gameStreams"]["ipad"]["away"]:
+			vco = GetStreamObject(gameUrl, away, "replayFullAway", "AwayReplayFullFormat", summary)
+			container.add(vco)
+			
+		#replays home
+		if "vod-condensed" in game["gameStreams"]["ipad"]["home"]:
+			vco = GetStreamObject(gameUrl, home, "replayShortHome", "HomeReplayCondensedFormat", summary)
+			container.add(vco)			
+		if "vod-whole" in game["gameStreams"]["ipad"]["home"]:
+			vco = GetStreamObject(gameUrl, home, "replayFullHome", "HomeReplayFullFormat", summary)
+			container.add(vco)
+			
 
-		if "live" in streams["gameStreams"]["ipad"]["home"]:
-			team = GetTeamConfig(game["h"]["ab"])
-			homeUrl = streams["gameStreams"]["ipad"]["home"]["live"]["bitrate0"] + "?meta=" + url + "&type=liveHome" + "&name=" + team["LiveName"] + "&logo=" + team["Logo"]
-			title = str(L("HomeStreamLabelFormat")).replace("{name}", team["Name"])
-			Log.Debug("homeUrl: " + homeUrl)
-			container.add(VideoClipObject(url = homeUrl, title = title, thumb = R(team["Logo"])))
-		
-	# replays
-	if game["a"]["replayShort"] != "":
-		container.add(GetStreamDirectory(selectQualityCallback, url, "replayShortAway", game["a"]["ab"], L("AwayReplayCondensedFormat"), replaysAvailable))
-	if game["a"]["replayFull"] != "":
-		container.add(GetStreamDirectory(selectQualityCallback, url, "replayFullAway", game["a"]["ab"], L("AwayReplayFullFormat"), replaysAvailable))
-		
-	if len(game["pbp"]) > 0:
-		container.add(DirectoryObject(title = L("Away Highlights"), thumb = R(GetTeamConfig(game["a"]["ab"])["Logo"]), 
-			key = Callback(highlightsCallback, gameId=gameId, forHomeTeam=False, title = L("Away Highlights"))))
+def GetStreamObject(gameUrl, teamAbbr, type, labelFormat, summary):
+	team = GetTeamConfig(teamAbbr)
+	url = gameUrl + "?type=" + type + "&name=" + team["LiveName"] + "&logo=" + team["Logo"] + "&summary=" + summary
+	title = str(L(labelFormat)).replace("{name}", team["Name"])
+	Log.Debug("stream url: " +  url)
 	
-	if game["h"]["replayShort"] != "":
-		container.add(GetStreamDirectory(selectQualityCallback, url, "replayShortHome", game["h"]["ab"], L("HomeReplayCondensedFormat"), replaysAvailable))
-	if game["h"]["replayFull"] != "":
-		container.add(GetStreamDirectory(selectQualityCallback, url, "replayFullHome", game["h"]["ab"], L("HomeReplayFullFormat"), replaysAvailable))
-		
-	#same if twice, so we can keep home and way elements together
-	if len(game["pbp"]) > 0:
-		container.add(DirectoryObject(title = L("Home Highlights"), thumb = R(GetTeamConfig(game["h"]["ab"])["Logo"]), 
-			key = Callback(highlightsCallback, gameId=gameId, forHomeTeam=True, title = L("Home Highlights"))))
+	return VideoClipObject(url = url, title = title, thumb = R(team["Logo"]))
+	
 	
 
 def BuildHighlightsMenu(container, gameId, forHomeTeam, title, selectQualityCallback):
@@ -275,19 +282,24 @@ def GetStreamDirectory(selectQualityCallback, gameUrl, type, teamAb, titleFormat
 
 
 def GetGameAndUrl(gameId):
-	url = GAME_URL.replace("{gameid}", gameId)
+	
+	t = str(gameId)[4:6]
+	gn = str(gameId)[6:]
+
+	url = GAME_URL.replace("{t}", t).replace("{gn}", gn)
 	Log.Debug("Loading game from url: " + url)
 	game = JSON.ObjectFromURL(url)
+	
+	
 	
 	return game, url
 	
 def GetToday():
 	
-	todayString = str(HTTP.Request(TODAY_URL, follow_redirects=False, cacheTime=0).content).strip()
-	Log.Debug("Today from file: " + todayString)
-	today = datetime.datetime.strptime(todayString, DATE_FORMAT)
-	today = today.replace(tzinfo = EASTERN)
+	#now = datetime.now()
+	#hereNow = now.replace(tzinfo=HERE)
 	
+	today = datetime.datetime.now(EASTERN)
 	Log.Debug("Today: " + str(today))
 	
 	return today
@@ -306,25 +318,29 @@ def GetGameSummariesForDay(date):
 	
 	games = []
 	
-	try:
-		schedule = JSON.ObjectFromURL(url)	
-	except:
-		Log.Error("Unable to open schedule url")
+	#try:
+	schedule = JSON.ObjectFromURL(url)	
+	#except:
+	#	Log.Error("Unable to open schedule url")
 		# couldn't load url, return no games
-		return games
+	#	return games
 	
-	Log.Info("Found " + str(len(schedule)) + " games")	
+	Log.Info("Found " + str(len(schedule["games"])) + " games")	
 		
 	for item in schedule["games"]:		
-		gameId = item["id"]
-		utcStart = parser.parse(item["utcStart"])
-		summary = item["summary"]
-		home = item["h"]
-		away = item["a"]
+		gameId = item["gameId"]
+		Log.Info("Date: " + date + " " + item["startTime"])
+		naive = parser.parse(date + " " + item["startTime"])
+		easternStart = naive.replace(tzinfo=EASTERN)
+		summary = "" # gamePreview won't exist if game is in progress
+		if "gamePreview" in item:
+			summary = item["gamePreview"]
+		home = item["h"]["ab"]
+		away = item["a"]["ab"]
 				
-		Log.Debug(away + " at " + home + " at " + str(utcStart) + "(utc)")		
+		Log.Debug(away + " at " + home + " at " + str(easternStart) + "(ET)")		
 		
-		game = GameSummary(gameId, utcStart, summary, home, away)		
+		game = GameSummary(gameId, easternStart, summary, home, away)		
 		games.append(game) 
 		
 	return games

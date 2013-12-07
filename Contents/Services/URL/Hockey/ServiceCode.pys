@@ -16,13 +16,8 @@ def MetadataObjectForURL(url):
 	data = ParseQueryString(url)
 	#Log.Debug("data: " + str(data))
 	title = ""
-	
-	if "meta" in data:
-		game = GetGameJson(data["meta"])
-	else:
-		game = GetGameJson(url)
-	
-	desc = game["summary"]
+		
+	desc = data["summary"]
 	logo = R(data["logo"])
 	
 	if data["type"] == "liveAway" or data["type"] == "liveHome":
@@ -33,7 +28,6 @@ def MetadataObjectForURL(url):
 		title = "Condensed Replay"
 	elif data["type"] == "highlight":
 		title = "Highlight"
-		desc = data["summary"] # highlights pass summary on url
 	
 
     # Construct a metadata item
@@ -48,20 +42,20 @@ def MetadataObjectForURL(url):
 def MediaObjectsForURL(url):
 
 	data = ParseQueryString(url)
-	if "meta" in data:
-		game = GetGameJson(data["meta"])
-	else:
-		game = GetGameJson(url)
+	
+	game = GetGameJson(url)
 	
 	type = data["type"]
 	
 	Log.Debug("Media object type: " + type)
 	
 	if type == "replayFullHome" or type == "replayFullAway" or type == "replayShortHome" or type == "replayShortAway":
-		return BuildReplayObject(game, data)
+		#return BuildReplayObject(game, data)
+		return BuildStream(type, game)
 	
 	if type == "liveHome" or type == "liveAway":
-		return BuildLiveStream(url)
+		#return BuildLiveStream(type, game)
+		return BuildStream(type, game)
 		
 	if type == "highlight":
 		return BuildHighlightObject(game, data)
@@ -72,7 +66,45 @@ def MediaObjectsForURL(url):
 
 
 ####################################################################################################
-def BuildLiveStream(url):
+def BuildLiveStream(type, game):
+	
+	url = ""
+	
+	if type == "liveHome":
+		url = game["gameStreams"]["ipad"]["home"]["live"]["bitrate0"]
+	
+	if type == "liveAway":
+		url = game["gameStreams"]["ipad"]["away"]["live"]["bitrate0"]
+	
+	Log.Debug("Live URL: " + url)
+	
+	return [
+		 MediaObject(
+			optimized_for_streaming=True,
+			parts = [PartObject(key=HTTPLiveStreamURL(Callback(PlayHLS2, url=url)))],
+		)
+	]
+	
+def BuildStream(type, game):
+	
+	url = ""
+	
+	homeAway = ""
+	source = ""
+	
+	if type == "liveHome" or type == "replayFullHome" or type == "replayShortHome":
+		homeAway = "home"
+	else:
+		homeAway = "away"
+		
+	if type == "liveHome" or type == "liveAway":
+		source = "live"
+	elif type == "replayShortHome" or type == "replayShortAway":
+		source = "vod-condensed"
+	elif type == "replayFullHome" or type == "replayFullAway":
+		source = "vod-whole"
+	
+	url = game["gameStreams"]["ipad"][homeAway][source]["bitrate0"]
 	
 	Log.Debug("Live URL: " + url)
 	

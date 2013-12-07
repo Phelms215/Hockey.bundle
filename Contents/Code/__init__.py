@@ -47,20 +47,17 @@ def ScheduleMenu(date, title):
 	
 	return dir
 	
-def ArchiveMenu():
+def ArchiveMenu(startDate):
 	dir = ObjectContainer(title2 = "Archive", art=R(core.ART))
-	# this should allow users to select older dates than the main menu shows.
-	dir.add(DirectoryObject(
-		key = Callback(ArchiveMenu), # call back to itself makes it go nowhere - in some clients anyway.
-		title = "Archive coming soon"
-	))
+	
+	core.BuildArchiveMenu(dir, startDate, ScheduleMenu, ArchiveMenu, MainMenu)
 	
 	return dir
 	 
-def GameMenu(gameId, title):
+def GameMenu(gameId, title, home, away, summary):
 	dir = ObjectContainer(title2 = title, art=R(core.ART), view_group = "List")
 	
-	core.BuildGameMenu(dir, gameId, HighlightsMenu, SelectQualityMenu) 
+	core.BuildGameMenu(dir, gameId, HighlightsMenu, SelectQualityMenu, home, away, summary) 
 	
 	if len(dir) == 0:		
 		dir.add(DirectoryObject(

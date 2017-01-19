@@ -11,7 +11,7 @@ ICON = 'icon-default.png'
 DEFAULT_TEAM_ICON = "Team_DEFAULT.jpg"
 
 SCHEDULE_URL = "http://smb.cdnak.neulion.com/fs1/nhl/league/schedule/{year}/{month}/{day}/iphone/schedule.json"
-GAME_URL = "http://smb.cdnak.neulion.com/fs/nhl/mobile/feed_new/data/streams/2013/ipad/{t}_{gn}.json"
+GAME_URL = "http://smb.cdnak.neulion.com/fs/nhl/mobile/feed_new/data/streams/{year}/ipad/{t}_{gn}.json"
 
 STREAM_AVAILABLE_MINUTES_BEFORE = 20
 STREAM_HIDDEN_AFTER = 360 # 6 hours oughta be plenty...
